@@ -87,32 +87,31 @@ async def json_intake(request: JsonIntakeRequest):
             if "payment" in str(last_field).lower() or "pay" in str(latest_input).lower():
                 if "paid" in latest_input.lower() or "done" in latest_input.lower():
                     updated_data["payment_status"] = "paid"
-            
-            # Use LLM for other fields to extract structured data
-            extraction_prompt = f"""
-            EXTRACT info from user input into JSON.
-            CONTEXT: Question was about "{last_field}". User said "{latest_input}".
-            EXISTING DATA: {json.dumps(collected_data)}
-            
-            RULES:
-            1. Update the relevant field key (e.g., name, age, symptoms).
-            2. Normalize values (Age -> number, Gender -> Male/Female).
-            3. If user says "Paid" for payment, set "payment_status": "paid".
-            
-            OUTPUT JSON: {{ "field_key": value }}
-            """
-            try:
-                extracted_json = await groq_service.generate_text(extraction_prompt, response_format={"type": "json_object"})
-                extracted_data = json.loads(extracted_json)
-                updated_data.update(extracted_data)
+            else:
+                # Use LLM for other fields to extract structured data
+                extraction_prompt = f"""
+                EXTRACT info from user input into JSON.
+                CONTEXT: Question was about "{last_field}". User said "{latest_input}".
+                EXISTING DATA: {json.dumps(collected_data)}
                 
-                # Debug Log
-                logger.info(f"🔹 Extraction Success. Extracted: {extracted_data}")
-                logger.info(f"🔸 Updated Data: {updated_data}")
+                RULES:
+                1. Update the relevant field key (e.g., name, age, symptoms).
+                2. Normalize values (Age -> number, Gender -> Male/Female).
                 
-            except Exception as e:
-                logger.error(f"Extraction Failed: {e}")
-                updated_data[last_field] = latest_input
+                OUTPUT JSON: {{ "field_key": value }}
+                """
+                try:
+                    extracted_json = await groq_service.generate_text(extraction_prompt, response_format={"type": "json_object"})
+                    extracted_data = json.loads(extracted_json)
+                    updated_data.update(extracted_data)
+                    
+                    # Debug Log
+                    logger.info(f"🔹 Extraction Success. Extracted: {extracted_data}")
+                    logger.info(f"🔸 Updated Data: {updated_data}")
+                    
+                except Exception as e:
+                    logger.error(f"Extraction Failed: {e}")
+                    updated_data[last_field] = latest_input
 
         # --- 3. DETERMINE NEXT STEP ---
         # Deterministic check for Payment Success
